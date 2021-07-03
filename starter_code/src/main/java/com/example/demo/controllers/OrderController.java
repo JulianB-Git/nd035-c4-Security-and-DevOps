@@ -2,7 +2,11 @@ package com.example.demo.controllers;
 
 import java.util.List;
 
+import com.example.demo.constants.LoggerMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,16 +31,24 @@ public class OrderController {
 	
 	@Autowired
 	private OrderRepository orderRepository;
-	
+
+	private static Logger logger = LoggerFactory.getLogger(OrderController.class);
 	
 	@PostMapping("/submit/{username}")
-	public ResponseEntity<UserOrder> submit(@PathVariable String username) {
+	public ResponseEntity<Object> submit(@PathVariable String username) {
 		User user = userRepository.findByUsername(username);
 		if(user == null) {
-			return ResponseEntity.notFound().build();
+			logger.error("Submitting order error: "+LoggerMessage.USER_NOT_FOUND);
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiError(LoggerMessage.USER_NOT_FOUND, null));
 		}
+		if (user.getCart().getItems().size() == 0){
+			logger.error("Submitting order error: "+LoggerMessage.CART_IS_EMPTY);
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiError(LoggerMessage.CART_IS_EMPTY, null));
+		}
+
 		UserOrder order = UserOrder.createFromCart(user.getCart());
 		orderRepository.save(order);
+		logger.error(LoggerMessage.ORDER_SUCCESS+username);
 		return ResponseEntity.ok(order);
 	}
 	

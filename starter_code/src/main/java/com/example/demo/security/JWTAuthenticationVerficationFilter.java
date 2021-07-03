@@ -8,6 +8,8 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.auth0.jwt.exceptions.TokenExpiredException;
+import com.example.demo.constants.LoggerMessage;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,7 +20,6 @@ import com.auth0.jwt.JWT;
 
 import static com.auth0.jwt.algorithms.Algorithm.HMAC512;
 
-@Component
 public class JWTAuthenticationVerficationFilter extends BasicAuthenticationFilter {
 	
 	public JWTAuthenticationVerficationFilter(AuthenticationManager authManager) {
@@ -26,7 +27,7 @@ public class JWTAuthenticationVerficationFilter extends BasicAuthenticationFilte
     }
 	
 	@Override
-    protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain) 
+    protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
     		throws IOException, ServletException {
         String header = req.getHeader(SecurityConstants.HEADER_STRING);
 
@@ -35,7 +36,14 @@ public class JWTAuthenticationVerficationFilter extends BasicAuthenticationFilte
             return;
         }
 
-        UsernamePasswordAuthenticationToken authentication = getAuthentication(req);
+        UsernamePasswordAuthenticationToken authentication = null;
+
+        try {
+            authentication = getAuthentication(req);
+        } catch (TokenExpiredException e) {
+            logger.error(LoggerMessage.TOKEN_EXPIRED);
+        }
+
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         chain.doFilter(req, res);
@@ -47,6 +55,7 @@ public class JWTAuthenticationVerficationFilter extends BasicAuthenticationFilte
             String user = JWT.require(HMAC512(SecurityConstants.SECRET.getBytes())).build()
                     .verify(token.replace(SecurityConstants.TOKEN_PREFIX, ""))
                     .getSubject();
+
             if (user != null) {
                 return new UsernamePasswordAuthenticationToken(user, null, new ArrayList<>());
             }
